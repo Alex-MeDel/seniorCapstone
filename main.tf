@@ -3,9 +3,10 @@
 # Full Disclosure, I used Google and Google Gemini to aid in the creation of this file, specially around CDIR Blocks and security
 
 # TO DO LIST: 
-# 2. Need user_data, right now the script is only spining up blank Ubuntu instances, nothing install Docker or the other things
 # 3. No terraform.tfvars, or variable definitions, so the AMI IDs and region are hardcoded, a limitation to consider
 # 4. Verify that us-east-1 is most appropriate region
+# 5. Solution for how to deploy the docker-compose YAML within AWS would be to store the docker-compose file in an S3 bucket and have user_data pull it down with aws s3 cp. 
+
 
 # ==========================================
 # HOSPITAL HONEYPOT AUTOMATED DEPLOYMENT
@@ -127,6 +128,100 @@ resource "aws_instance" "the_brain" {
     vpc_security_group_ids = [aws_security_group.brain_sg.id]
     private_ip             = "10.0.2.10"
     tags                   = { Name = "The-Brain-ELK" }
+
+    # CONFIGURE EVERYTHING ON STARTUP!!!
+    # Also creates and RUNS the Docker-Compose File - Cant do due to having multiple heredocs (bash and terraform would likely break the YAML formating and break everything)
+    # Proposed solution: An S3 bucket in Terraform to store the file 
+    # Will try to do Docker-Compose YAML here first and if it fails will do S3 bucket solution
+    # Used AI to try to fix text alignment issues in heredocs before they happen, hoping for best
+    user_data = <<-EOF
+      #!/bin/bash
+      # 1. System Requirements
+      sysctl -w vm.max_map_count=262144
+      echo "vm.max_map_count=262144" >> /etc/sysctl.conf
+      
+      # 2. Dependencies
+      apt-get update -y
+      apt-get install -y docker.io docker-compose
+      systemctl enable docker
+      systemctl start docker
+
+      mkdir -p /home/ubuntu/logstash/pipeline
+
+      # 3. Write Logstash Config (Note the unique delimiter)
+      cat <<'LOG_CONFIG' > /home/ubuntu/logstash/pipeline/logstash.conf
+input {
+  beats { port => 5044 }
+}
+output {
+  elasticsearch { hosts => ["elasticsearch:9200"] }
+}
+LOG_CONFIG
+
+      # 4. Write Docker Compose file (Essentially a copy paste without comments)
+      cat <<'COMPOSE_FILE' > /home/ubuntu/docker-compose.yml
+version: '3.8'
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.2
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms2g -Xmx2g"
+      - xpack.security.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+    networks:
+      - honeypot-net
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.10.2
+    container_name: logstash
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+    ports:
+      - 5044:5044 # Port for incoming Beats (Winlogbeat/Filebeat)
+    environment:
+      - LS_JAVA_OPTS=-Xms1g -Xmx1g
+    depends_on:
+      - elasticsearch
+    networks:
+      - honeypot-net
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.10.2
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - 5601:5601 # Accessible via AWS Client VPN
+    depends_on:
+      - elasticsearch
+    networks:
+      - honeypot-net
+
+
+networks:
+  honeypot-net:
+    driver: bridge
+    
+volumes:
+  es_data:
+    driver: local
+
+COMPOSE_FILE
+
+      # 5. Execute
+      cd /home/ubuntu
+      docker-compose up -d
+EOF
 }
 
 # Medical Workstation (Windows 7 or 2012 Legacy) - Still deciding
@@ -179,6 +274,15 @@ resource "aws_route53_record" "pacs" {
     type    = "A"
     ttl     = "300"
     records = ["10.0.1.20"]
+}
+
+# Assigns the name "medical-workstation.hospital.internal" to the Windows Instance
+resource "aws_route53_record" "medical_workstation" {
+    zone_id = aws_route53_zone.private.zone_id
+    name    = "medical-workstation.hospital.internal"
+    type    = "A"
+    ttl     = "300"
+    records = [aws_instance.win7_workstation.private_ip]
 }
 
 # Assigns the name "iot-gateway.hospital.internal" to our IoT device.
