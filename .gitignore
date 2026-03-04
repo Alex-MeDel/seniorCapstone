@@ -1,0 +1,42 @@
+# ==========================================
+# TERRAFORM (Infrastructure)
+# ==========================================
+# Local state files - these contain your AWS infrastructure secrets
+*.tfstate
+*.tfstate.*
+crash.log
+*.usage.logs
+
+# Terraform local configuration and plugins
+.terraform/
+.terraform.lock.hcl
+
+# Sensitive variable files (where you might store AWS keys)
+*.tfvars
+*.tfvars.json
+
+# ==========================================
+# DOCKER (Containerization)
+# ==========================================
+# Ignore the actual data stored in the ELK stack
+# We don't want to upload gigabytes of logs to GitHub
+es_data/
+logstash/data/
+
+# ==========================================
+# PYTHON (Validation Script)
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# ==========================================
+# SYSTEM & IDE
+# ==========================================
+.DS_Store
+.vscode/
+.idea/
+*.log
