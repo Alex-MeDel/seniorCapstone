@@ -57,7 +57,7 @@ def knock_port(ip, port):
 # we would have successfully validated the honeypot's visibility without violating AWS policies against active penetration testing. 
 def main():
     print("--- Starting Hospital Honeypot Validation Script ---")
-    print("Goal: Generate traffic to verify ELK stack logging [cite: 48, 51]\n")
+    print("Goal: Generate traffic to verify ELK stack logging \n")
 
     for name, host in TARGETS.items():
         print(f"Testing {name} ({host})...")

@@ -311,7 +311,7 @@ resource "aws_instance" "imaging_server" {
       echo "deb [signed-by=/usr/share/keyrings/elastic-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" | tee /etc/apt/sources.list.d/elastic-8.x.list
       apt-get update && apt-get install filebeat -y
 
-      # 5. Configure Filebeat to send to The Brain (10.0.2.10) [cite: 67]
+      # 5. Configure Filebeat to send to The Brain (10.0.2.10)
       cat <<'LOG_SHIP' > /etc/filebeat/filebeat.yml
 filebeat.inputs:
 - type: filestream
