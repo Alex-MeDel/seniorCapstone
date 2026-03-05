@@ -137,11 +137,9 @@ After running, open Kibana and verify that log entries are appearing for the Cli
 
 ## ⚠️ Known Limitations & TODOs
 
-- [ ] `main.tf` does not yet include `user_data` scripts — EC2 instances spin up blank (Docker/software must be installed manually)
 - [ ] AMI IDs and AWS region (`us-east-1`) are hardcoded — no `terraform.tfvars` or variable definitions yet
 - [ ] Windows 7 AMI availability on AWS is limited; currently using Windows Server 2012 as a substitute
 - [ ] Elasticsearch security (`xpack`) is disabled for development — must be enabled with TLS before any production-like use
-- [ ] `medical-workstation.hospital.internal` does not yet have a Route 53 DNS record defined in `main.tf`
 
 ---
 

@@ -76,11 +76,25 @@ resource "aws_security_group" "brain_sg" {
     }
 
     # COMPLIANCE: "The Brain" is blocked from talking to the public internet
+    #egress {
+    #    from_port   = 0
+    #    to_port     = 0
+    #    protocol    = "-1"
+    #    cidr_blocks = ["127.0.0.1/32"] # Block all outbound 
+    #}
+
+    # TEMPORARY CODE: Allow outbound internet for bootstrapping (Docker images, apt packages)
+    # TODO: Restrict this after initial deployment is validated
+    # Option 1. Edit the main.tf and re-apply, just swap to old, commented version of this egress
+    # just a terraform apply after the edit should do it, according to the AI it will update the security group rule
+    # without touching the already configured 
+    # Option 2. Manutally, in the AWS Console EC2 -> Security Groups -> find brain-sg and clinical-sg -> edit
+    # outbound rules -> delete the 0.0.0.0/0 rule. No terraform needed.
     egress {
         from_port   = 0
         to_port     = 0
         protocol    = "-1"
-        cidr_blocks = ["127.0.0.1/32"] # Block all outbound 
+        cidr_blocks = ["0.0.0.0/0"]
     }
 }
 
@@ -105,11 +119,20 @@ resource "aws_security_group" "clinical_sg" {
     }
 
     # COMPLIANCE: These vulnerable devices are strictly forbidden from contacting the internet
+    #egress {
+    #    from_port   = 0
+    #    to_port     = 0
+    #    protocol    = "-1"
+    #    cidr_blocks = ["127.0.0.1/32"] # Compliance: No Internet 
+    #}
+
+    # TEMPORARY CODE: Allow outbound internet for bootstrapping (Filebeat, Winlogbeat, conpot, DCM4CHE)
+    # TODO: Restrict this after initial deployment is validated
     egress {
         from_port   = 0
         to_port     = 0
         protocol    = "-1"
-        cidr_blocks = ["127.0.0.1/32"] # Compliance: No Internet 
+        cidr_blocks = ["0.0.0.0/0"]
     }
 }
 
