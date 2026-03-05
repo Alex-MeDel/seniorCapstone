@@ -1,6 +1,6 @@
 # Goal of this, is to redeploy the entire hospital environment automatically if an instance crashes or needs to be reset
 # Hybrid Architecture (Containers + VMs) + VPC, Subnets, Security Groups, compute resources, etc.
-# Full Disclosure, I used Google and Google Gemini to aid in the creation of this file, specially around CDIR Blocks and security
+# Full Disclosure, I used Google and Google Gemini to aid in the creation of this file, specially around CDIR Blocks and security, as well as code revisions and PowerShell
 
 # TO DO LIST: 
 # 3. No terraform.tfvars, or variable definitions, so the AMI IDs and region are hardcoded, a limitation to consider
@@ -236,36 +236,47 @@ resource "aws_instance" "win7_workstation" {
     # This part attempts to automate the Windows 2012 Legacy Server Instance 
     # I dont know any PowerShell, so this is 100% AI generated code, NEEDS REVISION!!!!
     user_data = <<-EOF
-<powershell>
-# 1. Open Windows Firewall for SMB and ICMP (for validationScript.py)
-netsh advfirewall firewall add rule name="Allow SMB" dir=in action=allow protocol=TCP localport=445
-netsh advfirewall firewall add rule name="Allow Ping" protocol=icmpv4 dir=in action=allow
+    <powershell>
+    # Start logging to troubleshoot if something fails during deployment
+    Start-Transcript -Path "C:\userdata_transcript.txt"
 
-# 2. Download and Install Winlogbeat (The log shipper)
-$url = "https://artifacts.elastic.co/downloads/beats/winlogbeat/winlogbeat-8.10.2-windows-x86_64.zip"
-$dest = "C:\winlogbeat.zip"
-Invoke-WebRequest -Uri $url -OutFile $dest
-Expand-Archive -Path $dest -DestinationPath "C:\"
-Rename-Item "C:\winlogbeat-8.10.2-windows-x86_64" "C:\winlogbeat"
+    # 1. Open Windows Firewall for SMB and ICMP (for validationScript.py)
+    netsh advfirewall firewall add rule name="Allow SMB" dir=in action=allow protocol=TCP localport=445
+    netsh advfirewall firewall add rule name="Allow Ping" protocol=icmpv4 dir=in action=allow
 
-# 3. Configure Winlogbeat to point to The Brain (10.0.2.10) 
-$config = @"
-winlogbeat.event_logs:
-  - name: Application
-  - name: Security
-  - name: System
+    # 2. Download and Install Winlogbeat (The log shipper)
+    $url = "https://artifacts.elastic.co/downloads/beats/winlogbeat/winlogbeat-8.10.2-windows-x86_64.zip"
+    $dest = "C:\winlogbeat.zip"
 
-output.logstash:
-  hosts: ["10.0.2.10:5044"]
-"@
-$config | Out-File -FilePath "C:\winlogbeat\winlogbeat.yml" -Encoding utf8
+    # Added -UseBasicParsing to prevent Internet Explorer first-run errors
+    Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing
 
-# 4. Install and Start the Service
-cd C:\winlogbeat
-.\install-service-winlogbeat.ps1
-Start-Service winlogbeat
-</powershell>
-EOF
+    # Replaced Expand-Archive with .NET method for PowerShell 3.0/4.0 compatibility
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($dest, "C:\")
+    Rename-Item "C:\winlogbeat-8.10.2-windows-x86_64" "C:\winlogbeat"
+
+    # 3. Configure Winlogbeat to point to The Brain (10.0.2.10) 
+    $config = @"
+    winlogbeat.event_logs:
+    - name: Application
+    - name: Security
+    - name: System
+
+    output.logstash:
+    hosts: ["10.0.2.10:5044"]
+    "@
+    $config | Out-File -FilePath "C:\winlogbeat\winlogbeat.yml" -Encoding utf8
+
+    # 4. Install and Start the Service
+    cd C:\winlogbeat
+    # Bypassing the execution policy so the install script can run
+    PowerShell.exe -ExecutionPolicy Bypass -File .\install-service-winlogbeat.ps1
+    Start-Service winlogbeat
+
+    Stop-Transcript
+    </powershell>
+    EOF
 }
 
 # Imaging Server (Ubuntu + DICOM Sim) 
