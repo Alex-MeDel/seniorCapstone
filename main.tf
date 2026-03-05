@@ -227,33 +227,140 @@ EOF
 # Medical Workstation (Windows 7 or 2012 Legacy) - Still deciding
 # Simulates an old Windows computer used by nurses or doctors
 resource "aws_instance" "win7_workstation" {
-    ami                    = "ami-032599769356f916d" # AMI ID for Windows 2012 Server
+    ami                    = "ami-032599769356f916d" # Windows Server 2012 
     instance_type          = "t3.medium"
-    subnet_id              = aws_subnet.clinical_zone.id
-    vpc_security_group_ids = [aws_security_group.clinical_sg.id]
-    tags                   = { Name = "Win7-Clinical-Workstation" }
+    subnet_id              = aws_subnet.clinical_zone.id 
+    vpc_security_group_ids = [aws_security_group.clinical_sg.id] 
+    tags                   = { Name = "Win7-Clinical-Workstation" } 
+
+    # This part attempts to automate the Windows 2012 Legacy Server Instance 
+    # I dont know any PowerShell, so this is 100% AI generated code, NEEDS REVISION!!!!
+    user_data = <<-EOF
+<powershell>
+# 1. Open Windows Firewall for SMB and ICMP (for validationScript.py)
+netsh advfirewall firewall add rule name="Allow SMB" dir=in action=allow protocol=TCP localport=445
+netsh advfirewall firewall add rule name="Allow Ping" protocol=icmpv4 dir=in action=allow
+
+# 2. Download and Install Winlogbeat (The log shipper)
+$url = "https://artifacts.elastic.co/downloads/beats/winlogbeat/winlogbeat-8.10.2-windows-x86_64.zip"
+$dest = "C:\winlogbeat.zip"
+Invoke-WebRequest -Uri $url -OutFile $dest
+Expand-Archive -Path $dest -DestinationPath "C:\"
+Rename-Item "C:\winlogbeat-8.10.2-windows-x86_64" "C:\winlogbeat"
+
+# 3. Configure Winlogbeat to point to The Brain (10.0.2.10) 
+$config = @"
+winlogbeat.event_logs:
+  - name: Application
+  - name: Security
+  - name: System
+
+output.logstash:
+  hosts: ["10.0.2.10:5044"]
+"@
+$config | Out-File -FilePath "C:\winlogbeat\winlogbeat.yml" -Encoding utf8
+
+# 4. Install and Start the Service
+cd C:\winlogbeat
+.\install-service-winlogbeat.ps1
+Start-Service winlogbeat
+</powershell>
+EOF
 }
 
 # Imaging Server (Ubuntu + DICOM Sim) 
 # Mimics a PACS system used to store X-rays and MRI scans
 resource "aws_instance" "imaging_server" {
-    ami                    = "ami-0c7217cdde317cfec"
+    ami                    = "ami-0c7217cdde317cfec" # Ubuntu 22.04 AMI ID
     instance_type          = "t3.micro"
     subnet_id              = aws_subnet.clinical_zone.id
     vpc_security_group_ids = [aws_security_group.clinical_sg.id]
     private_ip             = "10.0.1.20"
     tags                   = { Name = "Imaging-Server-PACS" }
+
+    # AUTOMATE EVERYTHING!!! 
+    user_data = <<-EOF
+      #!/bin/bash
+      # 1. Update and install Java (Required for DCM4CHE)
+      apt-get update -y
+      apt-get install -y default-jre wget unzip
+
+      # 2. Download DCM4CHE (DICOM Toolkit)
+      mkdir -p /opt/dcm4che
+      wget https://github.com/dcm4che/dcm4che/releases/download/5.31.0/dcm4che-5.31.0-bin.zip -O /tmp/dcm4che.zip
+      unzip /tmp/dcm4che.zip -d /opt/dcm4che/
+
+      # 3. Start the DICOM Network Receiver (StoreSCP)
+      # This mimics a PACS system listening on the standard DICOM port 104
+      # Running in the background so the instance stays active
+      nohup /opt/dcm4che/dcm4che-5.31.0/bin/storescp --accept-all --port 104 &
+      
+      # 4. Install Filebeat for log forwarding to The Brain 
+      wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | gpg --dearmor -o /usr/share/keyrings/elastic-keyring.gpg
+      echo "deb [signed-by=/usr/share/keyrings/elastic-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" | tee /etc/apt/sources.list.d/elastic-8.x.list
+      apt-get update && apt-get install filebeat -y
+
+      # 5. Configure Filebeat to send to The Brain (10.0.2.10) [cite: 67]
+      cat <<'LOG_SHIP' > /etc/filebeat/filebeat.yml
+filebeat.inputs:
+- type: filestream
+  enabled: true
+  paths:
+    - /var/log/*.log
+output.logstash:
+  hosts: ["10.0.2.10:5044"]
+LOG_SHIP
+
+      systemctl enable filebeat
+      systemctl start filebeat
+    EOF
 }
 
 # IoT Gateway (Ubuntu + Conpot Docker)
 # A specialized tool (Conpot) that pretends to be a medical device
 resource "aws_instance" "iot_gateway" {
-    ami                    = "ami-0c7217cdde317cfec"
+    ami                    = "ami-0c7217cdde317cfec" # Ubuntu 22.04
     instance_type          = "t3.micro"
     subnet_id              = aws_subnet.clinical_zone.id
     vpc_security_group_ids = [aws_security_group.clinical_sg.id]
     private_ip             = "10.0.1.30"
     tags                   = { Name = "IoT-Gateway-Conpot" }
+
+    # AUTOMATE EVERYTHING!!! 
+    # This will install docker and run conpot to mimic medical equipment, will also install and configure filebeat
+    user_data = <<-EOF
+      #!/bin/bash
+      # 1. Install Docker
+      apt-get update -y
+      apt-get install -y docker.io
+      systemctl enable docker
+      systemctl start docker
+
+      # 2. Run Conpot with the Medical Template
+      # This maps Modbus (502) and HTTP (80) to mimic medical hardware
+      docker run -d --name conpot_medical \
+        -p 80:8888 \
+        -p 502:502 \
+        --restart always \
+        mushorg/conpot:latest --template medical
+
+      # 3. Install and Configure Filebeat for Log Shipping to The Brain (10.0.2.10)
+      wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | gpg --dearmor -o /usr/share/keyrings/elastic-keyring.gpg
+      echo "deb [signed-by=/usr/share/keyrings/elastic-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" | tee /etc/apt/sources.list.d/elastic-8.x.list
+      apt-get update && apt-get install filebeat -y
+
+      cat <<'LOG_SHIP' > /etc/filebeat/filebeat.yml
+filebeat.inputs:
+- type: container
+  paths:
+    - /var/lib/docker/containers/*/*.log
+output.logstash:
+  hosts: ["10.0.2.10:5044"]
+LOG_SHIP
+
+      systemctl enable filebeat
+      systemctl start filebeat
+    EOF
 }
 
 # ==========================================
