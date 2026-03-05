@@ -49,6 +49,16 @@ resource "aws_subnet" "brain_zone" {
     tags       = { Name = "The-Brain-Zone" }
 }
 
+# For SSH, this part adds a key pair resource
+# KEY STEP: Before!! terraform apply, generate key locally
+# ssh-keygen -t rsa -b 4096 -f ~/.ssh/honeypot_key
+# Then SSH after deploy
+# ssh -i ~/.ssh/honeypot_key ubuntu@10.0.2.10
+resource "aws_key_pair" "honeypot_key" {
+    key_name   = "honeypot-key"
+    public_key = file("~/.ssh/honeypot_key.pub")
+}
+
 # ==========================================
 # STEP 2: SECURITY GROUPS (Isolation/Digital Security Guards)
 # These section will act as stateful firewalls, controlling who can talk to whom
@@ -74,6 +84,14 @@ resource "aws_security_group" "brain_sg" {
         protocol    = "tcp"
         cidr_blocks = ["10.0.0.0/16"] # Access via Client VPN 
     }
+
+    # SSH ingress rule
+    ingress {
+        from_port   = 22
+        to_port     = 22
+        protocol    = "tcp"
+        cidr_blocks = ["10.0.0.0/16"] # Via VPN only
+}
 
     # COMPLIANCE: "The Brain" is blocked from talking to the public internet
     #egress {
@@ -150,6 +168,7 @@ resource "aws_instance" "the_brain" {
     subnet_id              = aws_subnet.brain_zone.id
     vpc_security_group_ids = [aws_security_group.brain_sg.id]
     private_ip             = "10.0.2.10"
+    key_name               = aws_key_pair.honeypot_key.key_name  # This is part of SSH config
     tags                   = { Name = "The-Brain-ELK" }
 
     # CONFIGURE EVERYTHING ON STARTUP!!!
@@ -254,6 +273,7 @@ resource "aws_instance" "win7_workstation" {
     instance_type          = "t3.medium"
     subnet_id              = aws_subnet.clinical_zone.id 
     vpc_security_group_ids = [aws_security_group.clinical_sg.id] 
+    key_name               = aws_key_pair.honeypot_key.key_name  # This is part of SSH config
     tags                   = { Name = "Win7-Clinical-Workstation" } 
 
     # This part attempts to automate the Windows 2012 Legacy Server Instance 
@@ -310,6 +330,7 @@ resource "aws_instance" "imaging_server" {
     subnet_id              = aws_subnet.clinical_zone.id
     vpc_security_group_ids = [aws_security_group.clinical_sg.id]
     private_ip             = "10.0.1.20"
+    key_name               = aws_key_pair.honeypot_key.key_name  # This is part of SSH config
     tags                   = { Name = "Imaging-Server-PACS" }
 
     # AUTOMATE EVERYTHING!!! 
@@ -358,6 +379,7 @@ resource "aws_instance" "iot_gateway" {
     subnet_id              = aws_subnet.clinical_zone.id
     vpc_security_group_ids = [aws_security_group.clinical_sg.id]
     private_ip             = "10.0.1.30"
+    key_name               = aws_key_pair.honeypot_key.key_name  # This is part of SSH config
     tags                   = { Name = "IoT-Gateway-Conpot" }
 
     # AUTOMATE EVERYTHING!!! 
