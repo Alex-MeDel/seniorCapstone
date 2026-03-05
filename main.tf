@@ -1,12 +1,21 @@
 # Goal of this, is to redeploy the entire hospital environment automatically if an instance crashes or needs to be reset
 # Hybrid Architecture (Containers + VMs) + VPC, Subnets, Security Groups, compute resources, etc.
-# Full Disclosure, I used Google and Google Gemini to aid in the creation of this file, specially around CDIR Blocks and security, as well as code revisions and PowerShell
+# Full Disclosure, I used Google, Google Gemini and claude AI to aid in the creation of this file, specially around networking and security, as well as code revisions and PowerShell
 
 # TO DO LIST: 
 # 3. No terraform.tfvars, or variable definitions, so the AMI IDs and region are hardcoded, a limitation to consider
-# 4. Verify that us-east-1 is most appropriate region
 # 5. Solution for how to deploy the docker-compose YAML within AWS would be to store the docker-compose file in an S3 bucket and have user_data pull it down with aws s3 cp. 
 
+# Deploy sequence should be: 
+# 1. ssh-keygen -t rsa -b 4096 -f ~/.ssh/honeypot_key
+# 2. terraform init
+# 3. terraform plan
+# 4. terraform apply
+# 5. Wait ~5min for user_data to finish then SSH into brain and run `docker ps` to confirm ELK is up
+# THEN
+# 1. Make changes to main.tf to restrict internet access
+# 2. Run Validation Script from "The Brain" instance, can maybe put it in an S3 bucket
+# 3. Check if Kibana lights up
 
 # ==========================================
 # HOSPITAL HONEYPOT AUTOMATED DEPLOYMENT
@@ -57,6 +66,39 @@ resource "aws_subnet" "brain_zone" {
 resource "aws_key_pair" "honeypot_key" {
     key_name   = "honeypot-key"
     public_key = file("~/.ssh/honeypot_key.pub")
+}
+
+# ==========================================
+# STEP 1.5: INTERNET GATEWAY + ROUTING
+# Gives the VPC an on-ramp to the internet for bootstrapping (Temporary, will later remove access)
+# ==========================================
+
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.hospital_vpc.id
+  tags   = { Name = "Hospital-Honeypot-IGW" }
+}
+
+resource "aws_route_table" "public_rt" {
+  vpc_id = aws_vpc.hospital_vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
+
+  tags = { Name = "Hospital-Public-RT" }
+}
+
+# Associate both subnets so instances can reach the internet during bootstrap
+resource "aws_route_table_association" "brain_rta" {
+  subnet_id      = aws_subnet.brain_zone.id
+  route_table_id = aws_route_table.public_rt.id
+}
+
+# REMOVE THIS AFTER DEPLOYMENT VALIDATION!!!!
+resource "aws_route_table_association" "clinical_rta" {
+  subnet_id      = aws_subnet.clinical_zone.id
+  route_table_id = aws_route_table.public_rt.id
 }
 
 # ==========================================
@@ -169,6 +211,7 @@ resource "aws_instance" "the_brain" {
     vpc_security_group_ids = [aws_security_group.brain_sg.id]
     private_ip             = "10.0.2.10"
     key_name               = aws_key_pair.honeypot_key.key_name  # This is part of SSH config
+    associate_public_ip_address = true   # This line will give the brain access to a public IP address for bootstraping
     tags                   = { Name = "The-Brain-ELK" }
 
     # CONFIGURE EVERYTHING ON STARTUP!!!
