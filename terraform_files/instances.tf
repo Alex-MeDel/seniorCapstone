@@ -1,201 +1,3 @@
-# Goal of this, is to redeploy the entire hospital environment automatically if an instance crashes or needs to be reset
-# Hybrid Architecture (Containers + VMs) + VPC, Subnets, Security Groups, compute resources, etc.
-# Full Disclosure, I used Google, Google Gemini and claude AI to aid in the creation of this file, specially around networking and security, as well as code revisions and PowerShell
-
-# TO DO LIST: 
-# 3. No terraform.tfvars, or variable definitions, so the AMI IDs and region are hardcoded, a limitation to consider
-# 5. Solution for how to deploy the docker-compose YAML within AWS would be to store the docker-compose file in an S3 bucket and have user_data pull it down with aws s3 cp. 
-
-# Deploy sequence should be: 
-# 1. ssh-keygen -t rsa -b 4096 -f ~/.ssh/honeypot_key
-# 2. terraform init
-# 3. terraform plan
-# 4. terraform apply
-# 5. Wait ~5min for user_data to finish then SSH into brain and run `docker ps` to confirm ELK is up
-# THEN
-# 1. Make changes to main.tf to restrict internet access
-# 2. Run Validation Script from "The Brain" instance, can maybe put it in an S3 bucket
-# 3. Check if Kibana lights up
-
-# ==========================================
-# HOSPITAL HONEYPOT AUTOMATED DEPLOYMENT
-# This script acts as a sort of blueprint, when run, AWS will automatically build 
-# the entire hospital network, servers, and security rules, as defined
-# Compliance: Strict outbound blocking to adhere to AWS Terms of Service 
-# ==========================================
-
-
-
-# This tells Terraform to build the infrastructure in the region us-east-1 (I thought it was most comvinient)
-provider "aws" {
-    region = "us-east-1"
-}
-
-# ==========================================
-# STEP 1: NETWORK FOUNDATION
-# Sort of like a property where we are building our hospital wing 
-# ==========================================
-
-# The VPC is our private "yard" within the AWS cloud "neighborhood"
-resource "aws_vpc" "hospital_vpc" {
-    cidr_block           = "10.0.0.0/16"
-    enable_dns_hostnames = true
-    enable_dns_support   = true
-    tags = { Name = "Hospital-Honeypot-VPC" }
-}
-
-# The "Clinical Zone" is like a specific ward in the hospital for patients (legacy assets)
-resource "aws_subnet" "clinical_zone" {
-    vpc_id     = aws_vpc.hospital_vpc.id
-    cidr_block = "10.0.1.0/24"
-    tags       = { Name = "Clinical-Zone" }
-}
-
-# "The Brain" is the secure server room where all the data is collected and analyzed
-resource "aws_subnet" "brain_zone" {
-    vpc_id     = aws_vpc.hospital_vpc.id
-    cidr_block = "10.0.2.0/24"
-    tags       = { Name = "The-Brain-Zone" }
-}
-
-# For SSH, this part adds a key pair resource
-# KEY STEP: Before!! terraform apply, generate key locally
-# ssh-keygen -t rsa -b 4096 -f ~/.ssh/honeypot_key
-# Then SSH after deploy
-# ssh -i ~/.ssh/honeypot_key ubuntu@10.0.2.10
-resource "aws_key_pair" "honeypot_key" {
-    key_name   = "honeypot-key"
-    public_key = file("~/.ssh/honeypot_key.pub")
-}
-
-# ==========================================
-# STEP 1.5: INTERNET GATEWAY + ROUTING
-# Gives the VPC an on-ramp to the internet for bootstrapping (Temporary, will later remove access)
-# ==========================================
-
-resource "aws_internet_gateway" "igw" {
-  vpc_id = aws_vpc.hospital_vpc.id
-  tags   = { Name = "Hospital-Honeypot-IGW" }
-}
-
-resource "aws_route_table" "public_rt" {
-  vpc_id = aws_vpc.hospital_vpc.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw.id
-  }
-
-  tags = { Name = "Hospital-Public-RT" }
-}
-
-# Associate both subnets so instances can reach the internet during bootstrap
-resource "aws_route_table_association" "brain_rta" {
-  subnet_id      = aws_subnet.brain_zone.id
-  route_table_id = aws_route_table.public_rt.id
-}
-
-# REMOVE THIS AFTER DEPLOYMENT VALIDATION!!!!
-resource "aws_route_table_association" "clinical_rta" {
-  subnet_id      = aws_subnet.clinical_zone.id
-  route_table_id = aws_route_table.public_rt.id
-}
-
-# ==========================================
-# STEP 2: SECURITY GROUPS (Isolation/Digital Security Guards)
-# These section will act as stateful firewalls, controlling who can talk to whom
-# ==========================================
-
-# Brain SG: Security rules for "The Brain" (Management Zone)
-resource "aws_security_group" "brain_sg" {
-    name   = "brain-sg"
-    vpc_id = aws_vpc.hospital_vpc.id
-
-    # Allow the clinical equipment to send their logs to the Brain for storage
-    ingress {
-        from_port   = 5044
-        to_port     = 5044
-        protocol    = "tcp"
-        cidr_blocks = ["10.0.1.0/24"] # Allow Beats from Clinical Zone 
-    }
-
-    # Allow authorized staff to view the Kibana data dashboard via a secure VPN
-    ingress {
-        from_port   = 5601
-        to_port     = 5601
-        protocol    = "tcp"
-        cidr_blocks = ["10.0.0.0/16"] # Access via Client VPN 
-    }
-
-    # SSH ingress rule
-    ingress {
-        from_port   = 22
-        to_port     = 22
-        protocol    = "tcp"
-        cidr_blocks = ["10.0.0.0/16"] # Via VPN only
-}
-
-    # COMPLIANCE: "The Brain" is blocked from talking to the public internet
-    #egress {
-    #    from_port   = 0
-    #    to_port     = 0
-    #    protocol    = "-1"
-    #    cidr_blocks = ["127.0.0.1/32"] # Block all outbound 
-    #}
-
-    # TEMPORARY CODE: Allow outbound internet for bootstrapping (Docker images, apt packages)
-    # TODO: Restrict this after initial deployment is validated
-    # Option 1. Edit the main.tf and re-apply, just swap to old, commented version of this egress
-    # just a terraform apply after the edit should do it, according to the AI it will update the security group rule
-    # without touching the already configured 
-    # Option 2. Manutally, in the AWS Console EC2 -> Security Groups -> find brain-sg and clinical-sg -> edit
-    # outbound rules -> delete the 0.0.0.0/0 rule. No terraform needed.
-    egress {
-        from_port   = 0
-        to_port     = 0
-        protocol    = "-1"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-}
-
-# Clinical SG: Security rules for the "Clinical Zone" (Vulnerable Assets)
-resource "aws_security_group" "clinical_sg" {
-    name   = "clinical-sg"
-    vpc_id = aws_vpc.hospital_vpc.id
-
-    # Allow "The Brain" to check if these devices are still running ("Knocks")
-    ingress {
-        from_port   = 0
-        to_port     = 65535
-        protocol    = "tcp"
-        cidr_blocks = ["10.0.2.0/24"] # Allow Validation Script "Knocks" 
-    }
-
-    egress {
-        from_port   = 0
-        to_port     = 65535
-        protocol    = "tcp"
-        cidr_blocks = ["10.0.2.0/24"] # Allow log shipping to Brain 
-    }
-
-    # COMPLIANCE: These vulnerable devices are strictly forbidden from contacting the internet
-    #egress {
-    #    from_port   = 0
-    #    to_port     = 0
-    #    protocol    = "-1"
-    #    cidr_blocks = ["127.0.0.1/32"] # Compliance: No Internet 
-    #}
-
-    # TEMPORARY CODE: Allow outbound internet for bootstrapping (Filebeat, Winlogbeat, conpot, DCM4CHE)
-    # TODO: Restrict this after initial deployment is validated
-    egress {
-        from_port   = 0
-        to_port     = 0
-        protocol    = "-1"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-}
-
 # ==========================================
 # STEP 3: COMPUTE RESOURCES (The Virtual Servers)
 # These are the actual computers that will run our hospital software
@@ -205,7 +7,7 @@ resource "aws_security_group" "clinical_sg" {
 # A powerful server used to run the ELK stack for data visualization
 # t3.large is important due to resourse consuption of the ELK Stack surpasing what a t3.medium can provide
 resource "aws_instance" "the_brain" {
-    ami                    = "ami-0c7217cdde317cfec" 
+    ami                    = var.brain_ami
     instance_type          = "t3.large"
     subnet_id              = aws_subnet.brain_zone.id
     vpc_security_group_ids = [aws_security_group.brain_sg.id]
@@ -311,13 +113,13 @@ EOF
 
 # Medical Workstation (Windows 7 or 2012 Legacy) - Still deciding
 # Simulates an old Windows computer used by nurses or doctors
-resource "aws_instance" "win7_workstation" {
-    ami                    = "ami-032599769356f916d" # Windows Server 2012 
+resource "aws_instance" "win_workstation" {
+    ami                    = var.win_ami # Windows Server 2012 
     instance_type          = "t3.medium"
     subnet_id              = aws_subnet.clinical_zone.id 
     vpc_security_group_ids = [aws_security_group.clinical_sg.id] 
     key_name               = aws_key_pair.honeypot_key.key_name  # This is part of SSH config
-    tags                   = { Name = "Win7-Clinical-Workstation" } 
+    tags                   = { Name = "Win-Clinical-Workstation" } 
 
     # This part attempts to automate the Windows 2012 Legacy Server Instance 
     # I dont know any PowerShell, so this is 100% AI generated code, NEEDS REVISION!!!!
@@ -368,7 +170,7 @@ resource "aws_instance" "win7_workstation" {
 # Imaging Server (Ubuntu + DICOM Sim) 
 # Mimics a PACS system used to store X-rays and MRI scans
 resource "aws_instance" "imaging_server" {
-    ami                    = "ami-0c7217cdde317cfec" # Ubuntu 22.04 AMI ID
+    ami                    = var.brain_ami # Ubuntu 22.04 AMI ID
     instance_type          = "t3.micro"
     subnet_id              = aws_subnet.clinical_zone.id
     vpc_security_group_ids = [aws_security_group.clinical_sg.id]
@@ -417,7 +219,7 @@ LOG_SHIP
 # IoT Gateway (Ubuntu + Conpot Docker)
 # A specialized tool (Conpot) that pretends to be a medical device
 resource "aws_instance" "iot_gateway" {
-    ami                    = "ami-0c7217cdde317cfec" # Ubuntu 22.04
+    ami                    = var.brain_ami # Ubuntu 22.04
     instance_type          = "t3.micro"
     subnet_id              = aws_subnet.clinical_zone.id
     vpc_security_group_ids = [aws_security_group.clinical_sg.id]
@@ -460,42 +262,4 @@ LOG_SHIP
       systemctl enable filebeat
       systemctl start filebeat
     EOF
-}
-
-# ==========================================
-# STEP 4: PRIVATE DNS (Route 53/Internal Phonebook) 
-# This allows our servers to talk to each other using names instead of numbers
-# ==========================================
-
-# Creates a private directory called "hospital.internal" only visible inside this VPC
-resource "aws_route53_zone" "private" {
-    name = "hospital.internal"
-    vpc { vpc_id = aws_vpc.hospital_vpc.id }
-}
-
-# Assigns the name "pacs.hospital.internal" to our Imaging Server's address
-resource "aws_route53_record" "pacs" {
-    zone_id = aws_route53_zone.private.zone_id
-    name    = "pacs.hospital.internal"
-    type    = "A"
-    ttl     = "300"
-    records = ["10.0.1.20"]
-}
-
-# Assigns the name "medical-workstation.hospital.internal" to the Windows Instance
-resource "aws_route53_record" "medical_workstation" {
-    zone_id = aws_route53_zone.private.zone_id
-    name    = "medical-workstation.hospital.internal"
-    type    = "A"
-    ttl     = "300"
-    records = [aws_instance.win7_workstation.private_ip]
-}
-
-# Assigns the name "iot-gateway.hospital.internal" to our IoT device.
-resource "aws_route53_record" "iot" {
-    zone_id = aws_route53_zone.private.zone_id
-    name    = "iot-gateway.hospital.internal"
-    type    = "A"
-    ttl     = "300"
-    records = ["10.0.1.30"]
 }
