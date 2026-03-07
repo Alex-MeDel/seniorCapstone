@@ -238,3 +238,11 @@ terraform destroy
 ```
 
 Type `yes` when prompted. This will remove all EC2 instances, the VPC, subnets, security groups, Route 53 zone, and the key pair.
+
+---
+
+## AI Disclosure & Methodology Statement 
+
+This project utilized Google Gemini and Claude AI as research and brainstorming assistants. Specifically, AI was used to assist with HCL (HashiCorp Configuration Language) syntax, PowerShell compatibility for legacy Windows environments, and the initial structuring of the ELK containerization.
+
+To ensure academic integrity and technical accuracy, all AI-generated code snippets were manually reviewed, cross-referenced with official AWS and HashiCorp documentation, and locally tested for functionality. All conceptual networking designs and the honeypot strategy are original work. Specific code sections heavily influenced by AI are marked with internal comments citing the model used.
