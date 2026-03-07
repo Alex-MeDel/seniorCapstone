@@ -1,9 +1,6 @@
 
 # Goal of this, is to redeploy the entire hospital environment automatically if an instance crashes or needs to be reset
 # Hybrid Architecture (Containers + VMs) + VPC, Subnets, Security Groups, compute resources, etc.
-# Full Disclosure, I used Google, Google Gemini and claude AI to aid in the creation of this file, specially around networking and security, as well as code revisions and PowerShell, 
-# its roll has been key to overcome the learning curve of containerization and HashiCorp Language, given that this is my first time using Terraform, it is mostly used to learn
-# the use of AI generated code has only been used as a last resource and will be properly cited. 
 
 # TO DO LIST: 
 # 5. Solution for how to deploy the docker-compose YAML within AWS would be to store the docker-compose file in an S3 bucket and have user_data pull it down with aws s3 cp. 
@@ -28,6 +25,18 @@
 # Compliance: Strict outbound blocking to adhere to AWS Terms of Service 
 # ==========================================
 
+# ==========================================
+# AI Disclosure & Methodology Statement:
+# This project utilized Google Gemini and Claude AI as research and brainstorming
+# assistants. Specifically, AI was used to assist with HCL (HashiCorp Configuration
+# Language) syntax, PowerShell compatibility for legacy Windows environments, and
+# the initial structuring of the ELK containerization.
+# To ensure academic integrity and technical accuracy, all AI-generated code
+# snippets were manually reviewed, cross-referenced with official AWS and HashiCorp
+# documentation, and locally tested for functionality. All conceptual networking
+# designs and the honeypot strategy are original work. Specific code sections heavily
+# influenced by AI are marked with internal comments citing the model used.
+# ==========================================
 
 # This tells Terraform to build the infrastructure in the region us-east-1 (I thought it was most comvinient)
 provider "aws" {
