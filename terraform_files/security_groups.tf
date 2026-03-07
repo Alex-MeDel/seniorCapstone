@@ -3,6 +3,8 @@
 # These section will act as stateful firewalls, controlling who can talk to whom
 # ==========================================
 
+# Google Gemini AI helped with brainstorming and research for this section, it also helped with polishing the code a little (removing incessary parts and rewriting some parts to make it more clear and professional)
+
 # Brain SG: Security rules for "The Brain" (Management Zone)
 resource "aws_security_group" "brain_sg" {
     name   = "brain-sg"

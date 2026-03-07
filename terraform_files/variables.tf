@@ -6,7 +6,7 @@ variable "aws_region" {
 
 # OLD hardcoded AMI IDs
 variable "brain_ami" {
-#  default = "ami-0c7217cdde317cfec"
+#  default = "ami-0c7217cdde317cfec" - Old, hardcoded AMI IDs
    default = data.aws_ami.ubuntu.id
 }
 

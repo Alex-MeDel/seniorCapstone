@@ -26,6 +26,7 @@ resource "aws_subnet" "brain_zone" {
 # Gives the VPC an on-ramp to the internet for bootstrapping (Temporary, will later remove access)
 # ==========================================
 
+# Google Gemini AI helped me produce and understand this part of the code 
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.hospital_vpc.id
   tags   = { Name = "Hospital-Honeypot-IGW" }

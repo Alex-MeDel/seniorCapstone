@@ -3,15 +3,18 @@
 # These are the actual computers that will run our hospital software
 # ==========================================
 
+# In this terraform file, Google Gemini helped me polish up the code (remove unecessary lines I made and better ways to do things) as well as aided me with a solution for YAML indentation
+# AI also helped me with the creation of the PowerShell script given I that I dont know any Windows administration, it is entirely AI generated and checked for errors with testing
+
 # The Brain (Ubuntu 22.04 + ELK Docker) 
 # A powerful server used to run the ELK stack for data visualization
 # t3.large is important due to resourse consuption of the ELK Stack surpasing what a t3.medium can provide
 resource "aws_instance" "the_brain" {
-    ami                    = var.brain_ami
-    instance_type          = "t3.large"
-    subnet_id              = aws_subnet.brain_zone.id
-    vpc_security_group_ids = [aws_security_group.brain_sg.id]
-    private_ip             = "10.0.2.10"
+    ami                    = var.brain_ami # Variables set in variables.tf
+    instance_type          = "t3.large" # Instance type from AWS 
+    subnet_id              = aws_subnet.brain_zone.id # Subnets created in vpc.tf
+    vpc_security_group_ids = [aws_security_group.brain_sg.id] # This is from security_groups.tf
+    private_ip             = "10.0.2.10" # Just sets static IP for this particular device
     key_name               = aws_key_pair.honeypot_key.key_name  # This is part of SSH config
     associate_public_ip_address = true   # This line will give the brain access to a public IP address for bootstraping
     tags                   = { Name = "The-Brain-ELK" }

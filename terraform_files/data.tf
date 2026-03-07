@@ -1,6 +1,7 @@
 # This is to get rid of hardcoded AMI IDs, this just retreives the latests AMI IDs from each OS
+# Claude AI Helped me with this section, it gave me the AWS account IDs, and explained the filtering process
+
 # Dynamically fetch latest Ubuntu 22.04 AMI from Canonical's official account
-# Claude AI Helped me with this section
 data "aws_ami" "ubuntu" {
   most_recent = true
   owners      = ["099720109477"] # Canonical's official AWS account ID
