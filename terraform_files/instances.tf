@@ -10,7 +10,7 @@
 # A powerful server used to run the ELK stack for data visualization
 # t3.large is important due to resourse consuption of the ELK Stack surpasing what a t3.medium can provide
 resource "aws_instance" "the_brain" {
-    ami                    = var.brain_ami # Variables set in variables.tf
+    ami                    = data.aws_ami.ubuntu.id # This is set in the data.tf, dynamic AMI IDs fix
     instance_type          = "t3.large" # Instance type from AWS 
     subnet_id              = aws_subnet.brain_zone.id # Subnets created in vpc.tf
     vpc_security_group_ids = [aws_security_group.brain_sg.id] # This is from security_groups.tf
@@ -117,7 +117,7 @@ EOF
 # Medical Workstation (Windows 7 or 2012 Legacy) - Still deciding
 # Simulates an old Windows computer used by nurses or doctors
 resource "aws_instance" "win_workstation" {
-    ami                    = var.win_ami # Windows Server 2012 
+    ami                    = data.aws_ami.windows_2012.id # Windows Server 2012, set in data.tf, dynamic AMI IDs
     instance_type          = "t3.medium"
     subnet_id              = aws_subnet.clinical_zone.id 
     vpc_security_group_ids = [aws_security_group.clinical_sg.id] 
@@ -175,7 +175,7 @@ resource "aws_instance" "win_workstation" {
 # Imaging Server (Ubuntu + DICOM Sim) 
 # Mimics a PACS system used to store X-rays and MRI scans
 resource "aws_instance" "imaging_server" {
-    ami                    = var.brain_ami # Ubuntu 22.04 AMI ID
+    ami                    = data.aws_ami.ubuntu.id # This is set in the data.tf, dynamic AMI IDs fix
     instance_type          = "t3.micro"
     subnet_id              = aws_subnet.clinical_zone.id
     vpc_security_group_ids = [aws_security_group.clinical_sg.id]
@@ -225,7 +225,7 @@ LOG_SHIP
 # IoT Gateway (Ubuntu + Conpot Docker)
 # A specialized tool (Conpot) that pretends to be a medical device
 resource "aws_instance" "iot_gateway" {
-    ami                    = var.brain_ami # Ubuntu 22.04
+    ami                    = data.aws_ami.ubuntu.id # This is set in the data.tf, dynamic AMI IDs fix
     instance_type          = "t3.micro"
     subnet_id              = aws_subnet.clinical_zone.id
     vpc_security_group_ids = [aws_security_group.clinical_sg.id]

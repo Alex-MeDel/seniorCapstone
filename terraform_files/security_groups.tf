@@ -70,11 +70,22 @@ resource "aws_security_group" "clinical_sg" {
         cidr_blocks = ["10.0.2.0/24"] # Allow Validation Script "Knocks" 
     }
 
+    # Allow log shipping to Brain over TCP (Filebeat/Winlogbeat → Logstash port 5044)
     egress {
         from_port   = 0
         to_port     = 65535
         protocol    = "tcp"
         cidr_blocks = ["10.0.2.0/24"] # Allow log shipping to Brain 
+    }
+
+    # New Addition
+    # Allow DNS resolution via Route 53 (UDP port 53) — required for hospital.internal hostnames
+    # Without this, internal DNS names like pacs.hospital.internal silently fail after bootstrap lockdown
+    egress {
+        from_port   = 53
+        to_port     = 53
+        protocol    = "udp"
+        cidr_blocks = ["10.0.0.0/16"] # VPC-wide, I think
     }
 
     # COMPLIANCE: These vulnerable devices are strictly forbidden from contacting the internet

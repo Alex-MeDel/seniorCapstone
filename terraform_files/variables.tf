@@ -4,13 +4,15 @@ variable "aws_region" {
   default = "us-east-1"
 }
 
-# OLD hardcoded AMI IDs
-variable "brain_ami" {
-#  default = "ami-0c7217cdde317cfec" - Old, hardcoded AMI IDs
-   default = data.aws_ami.ubuntu.id
-}
 
-variable "win_ami" {
+# CHANGE, "default =" must point to a litteral value, I just referenced data.aws_ami.ubuntu.id and the windows counterpart directly in the instance.tf
+# OLD hardcoded AMI IDs
+#variable "brain_ami" {
+#  default = "ami-0c7217cdde317cfec" - Old, hardcoded AMI IDs
+#   default = data.aws_ami.ubuntu.id
+#}
+
+#variable "win_ami" {
 #  default = "ami-032599769356f916d"
-   default = data.aws_ami.windows_2012.id
-}
+#   default = data.aws_ami.windows_2012.id
+#}

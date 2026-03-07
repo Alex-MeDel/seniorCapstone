@@ -35,11 +35,11 @@ PORTS = [80, 445, 104, 502]
 # Error Handling - "connect_ex" method, in theory returns a 0 if port is open and error code otherwise.
 # even if port is closed, the "attempt" itself creates a network event that winlogbeat or filebeat will capture and send to the "Brain" via TLS-Encrypted beats
 
-def knock_port(ip, port):
+def knock_port(ip, port): # I know that im not using IPs, original code had hardcoded IPs in mind and I decided to just keep the name to avoid confucion
     try:
         # Create a socket object
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(2)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: # This socket solution was recommended as a "professional polish" to my original code
+            s.settimeout(2) # Times out after the set time, this is important
             # Attempt to connect to simulate a "knock"
             # By using connect_ex the script will just try to archive a TCP handshake, 
             # this, in theory is enough to trigger a log entry in filebeat or Winlogbeat with out performing a malicious exploit
