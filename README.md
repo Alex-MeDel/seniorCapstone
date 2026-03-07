@@ -1,41 +1,56 @@
-(README.md Generated entirely by Claude AI and inspected for errors)
 # 🏥 Hospital Honeypot — Senior Capstone Project
+#### Group 4
 
-A cloud-based honeypot environment that simulates a vulnerable hospital network to observe, capture, and analyze simulated cyberattack patterns targeting healthcare infrastructure.
+A cloud-based honeypot environment that simulates a vulnerable hospital network to observe, capture, and analyze cyberattack patterns targeting healthcare infrastructure — deployed entirely on AWS using Terraform and an ELK stack.
+
+> ⚠️ **Disclaimer:** This environment is strictly isolated within a private AWS VPC with no outbound internet access post-deployment. It is designed for academic research only and is fully compliant with the AWS Acceptable Use Policy. No real patient data is used at any point.
 
 ---
 
 ## 📌 Project Overview
 
-This project deploys a realistic, isolated hospital network on AWS that intentionally exposes legacy medical systems as decoys. All traffic is captured and forwarded to a centralized logging stack for analysis. The goal is to study attack behaviors targeting healthcare-specific protocols and systems, such as DICOM imaging servers, Modbus IoT gateways, and legacy Windows workstations.
+The environment deploys a realistic dual-zone hospital network as a passive honeypot. The "Clinical Zone" contains intentionally vulnerable legacy medical assets acting as decoys. The "Brain Zone" runs a containerized ELK stack to aggregate, process, and visualize all captured logs. The goal is to study attack behaviors targeting healthcare-specific protocols — DICOM imaging servers, Modbus IoT gateways, and legacy Windows workstations — without performing any active attacks or violating AWS policies.
 
-> ⚠️ **Disclaimer:** This environment is strictly isolated within an AWS VPC with no outbound internet access. It is designed for academic research only and is fully compliant with AWS Terms of Service. No real patient data is used.
+Administrative access to Kibana and all instances is restricted to an AWS Client VPN. The VPN CIDR must be included in the Brain's security group rules to allow access to the Kibana dashboard on port 5601.
 
 ---
 
 ## 🏗️ Architecture
 
-The environment is divided into two network zones within a private AWS VPC (`10.0.0.0/16`):
+The environment runs inside a single AWS VPC (`10.0.0.0/16`) split across two network zones:
 
-### 🧠 The Brain Zone (`10.0.2.0/24`)
-The secure management server running the ELK Stack for log collection, processing, and visualization.
+```
+AWS VPC: 10.0.0.0/16
+│
+├── 🏥 Clinical Zone (10.0.1.0/24)  ← Vulnerable honeypot decoys
+│   ├── Medical Workstation   — Windows Server 2012 R2 + Winlogbeat
+│   ├── Imaging Server (PACS) — 10.0.1.20  Ubuntu + DCM4CHE (DICOM)
+│   └── IoT Gateway           — 10.0.1.30  Ubuntu + Conpot (Modbus/HTTP)
+│
+└── 🧠 Brain Zone (10.0.2.0/24)     ← Management & logging
+    └── The Brain / ELK       — 10.0.2.10  Ubuntu + ELK via Docker Compose
+```
 
-| Component     | Role                                                   |
-|---------------|--------------------------------------------------------|
-| Elasticsearch | Stores and indexes all captured log data               |
-| Logstash      | Ingests and transforms incoming Beats log streams      |
-| Kibana        | Web dashboard for real-time log visualization          |
+**Internal DNS** (`hospital.internal` via Route 53 Private Hosted Zone):
 
-> Hosted on a `t3.large` EC2 instance (Ubuntu 22.04). All three services run as Docker containers via `docker-compose`.
+| Hostname | Resolves To |
+|---|---|
+| `pacs.hospital.internal` | 10.0.1.20 |
+| `iot-gateway.hospital.internal` | 10.0.1.30 |
+| `medical-workstation.hospital.internal` | Windows private IP (dynamic) |
 
-### 🏥 Clinical Zone (`10.0.1.0/24`)
-Simulated legacy medical assets acting as honeypot decoys.
+---
 
-| Asset                     | Hostname                          | Simulates                              | Key Ports     |
-|---------------------------|-----------------------------------|----------------------------------------|---------------|
-| Medical Workstation       | `medical-workstation.hospital.internal` | Legacy Windows 7 / 2012 terminal  | 445 (SMB)     |
-| Imaging Server (PACS)     | `pacs.hospital.internal`          | DICOM-based radiology system           | 104 (DICOM)   |
-| IoT Gateway (Conpot)      | `iot-gateway.hospital.internal`   | Medical IoT / MRI controller           | 502 (Modbus), 80 (HTTP) |
+## 🖥️ Hardware & Software
+
+| Component | OS / Software | Purpose | AWS Instance | AMI |
+|---|---|---|---|---|
+| Medical Workstation | Windows Server 2012 R2 | Simulates a legacy hospital terminal | t3.medium | Dynamic (data.tf) |
+| Imaging Server | Ubuntu 22.04 + DCM4CHE | DICOM/PACS radiology system simulator | t3.micro | Dynamic (data.tf) |
+| IoT Gateway | Ubuntu 22.04 + Conpot | Medical IoT / MRI controller simulator | t3.micro | Dynamic (data.tf) |
+| The Brain | Ubuntu 22.04 + ELK Stack | Central log aggregation & visualization | t3.large | Dynamic (data.tf) |
+
+> AMI IDs are resolved dynamically at deploy time via `data.tf` — no hardcoded IDs. The `t3.large` is required for the Brain because Elasticsearch's RAM usage exceeds what a `t3.medium` can provide (ES is allocated 2GB, Logstash 1GB).
 
 ---
 
@@ -43,55 +58,244 @@ Simulated legacy medical assets acting as honeypot decoys.
 
 ```
 .
-├── main.tf                  # Terraform — AWS infrastructure (VPC, subnets, EC2, Route 53)
-├── docker-compose.yml       # ELK Stack deployment for "The Brain"
-├── validationScript.py      # Connectivity validation and traffic generation script
+├── main.tf                        # AWS provider config
+├── variables.tf                   # AMI variables (resolved via data.tf)
+├── vpc.tf                         # VPC, subnets, internet gateway, route tables
+├── security_groups.tf             # Firewall rules for Brain and Clinical zones
+├── instances.tf                   # EC2 instances + user_data bootstrap scripts
+├── keys.tf                        # SSH key pair resource
+├── dns.tf                         # Route 53 private zone + DNS records
+├── outputs.tf                     # Prints Brain public IP + Kibana URL post-apply
+├── data.tf                        # Dynamic AMI lookups (Ubuntu 22.04, Win 2012 R2)
+├── docker-compose.yml             # ELK Stack definition for The Brain
+├── validationScript.py            # Connectivity validation and traffic generation
 └── logstash/
     └── pipeline/
-        └── logstash.conf    # Logstash pipeline config (Beats → Elasticsearch)
+        └── logstash.conf          # Logstash pipeline (Beats → Elasticsearch)
 ```
 
 ---
 
-## 🚀 Deployment
+## ✅ Prerequisites
 
-### Prerequisites
+Before running anything, ensure you have:
 
-- [Terraform](https://www.terraform.io/) installed
-- [Docker](https://www.docker.com/) & Docker Compose installed on the Brain instance
-- AWS CLI configured with appropriate IAM permissions
-- AWS Client VPN configured for Kibana access
+- [ ] [Terraform](https://developer.hashicorp.com/terraform/intro) installed
+- [ ] [AWS CLI](https://aws.amazon.com/cli/) installed and configured (`aws configure`)
+- [ ] AWS account with permissions for EC2, VPC, Route 53, and IAM key pairs
+- [ ] AWS Client VPN configured (required for Kibana and SSH access post-lockdown)
+- [ ] SSH keygen available locally
 
-### Step 1 — Provision Infrastructure
+---
+
+## 🚀 Deployment Steps
+
+### Step 1 — Generate the SSH Key
+
+**Do this before `terraform apply`.** Terraform registers this key pair in AWS; it must exist on disk first.
+
+```bash
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/honeypot_key
+```
+
+This creates:
+- `~/.ssh/honeypot_key` — private key (never share)
+- `~/.ssh/honeypot_key.pub` — uploaded to AWS by Terraform
+
+### Step 2 — Initialize Terraform
 
 ```bash
 terraform init
+```
+
+### Step 3 — Preview the Plan
+
+```bash
+terraform plan
+```
+
+Watch for `ubuntu_ami_used` and `windows_ami_used` in the output — these confirm which AMIs were dynamically resolved before you commit to the apply.
+
+### Step 4 — Deploy
+
+```bash
 terraform apply
 ```
 
-This will create:
-- A VPC with Clinical and Brain subnets
-- Security groups with strict inter-zone and outbound rules
-- EC2 instances for all four nodes
-- A Route 53 private hosted zone (`hospital.internal`)
+Type `yes` when prompted. On completion, Terraform will print:
 
-### Step 2 — Deploy the ELK Stack
+```
+brain_public_ip  = "x.x.x.x"
+elk_kibana_url   = "http://x.x.x.x:5601"
+ubuntu_ami_used  = "ami-xxxxxxxxxxxxxxxxx"
+windows_ami_used = "ami-xxxxxxxxxxxxxxxxx"
+```
 
-SSH into the Brain instance (`10.0.2.10`) and run:
+### Step 5 — Wait ~5 Minutes for Bootstrap
+
+All instances run `user_data` scripts on first boot. Give it approximately 5 minutes for the following to complete automatically:
+
+- **The Brain:** Docker, Docker Compose, Elasticsearch 8.10.2, Logstash 8.10.2, Kibana 8.10.2
+- **Imaging Server:** Java, DCM4CHE (DICOM/PACS simulator), Filebeat
+- **IoT Gateway:** Docker, Conpot with medical template (Modbus/HTTP), Filebeat
+- **Windows Workstation:** Winlogbeat 8.10.2 download, install, and service start
+
+### Step 6 — Confirm ELK is Running
+
+SSH into The Brain and check containers:
 
 ```bash
-# Required: increase virtual memory for Elasticsearch
-sudo sysctl -w vm.max_map_count=262144
+ssh -i ~/.ssh/honeypot_key ubuntu@<brain_public_ip>
+docker ps
+```
 
-# Start all ELK containers
+You should see three containers running: `elasticsearch`, `logstash`, and `kibana`. Then open Kibana:
+
+```
+http://<brain_public_ip>:5601
+```
+
+If Kibana loads, the stack is healthy. ✅
+
+---
+
+## 🧪 Validation
+
+Once the environment is up and Kibana is accessible, run the validation script **from The Brain instance** to generate synthetic traffic across all Clinical Zone assets and confirm the full logging pipeline is working end-to-end.
+
+```bash
+python3 validationScript.py
+```
+
+**What the script does:**
+
+The script performs passive TCP "knocks" — Python `connect_ex` calls that initiate TCP handshakes without sending any exploit payload. It tests each honeypot asset across four protocol-relevant ports:
+
+| Port | Protocol | Target Asset |
+|---|---|---|
+| 80 | HTTP | IoT Gateway (Conpot) |
+| 104 | DICOM | Imaging Server (PACS) |
+| 445 | SMB | Windows Workstation |
+| 502 | Modbus | IoT Gateway (Conpot) |
+
+Even if a port is closed, the TCP handshake attempt itself generates a network event that Winlogbeat or Filebeat captures and forwards to the Brain on port 5044.
+
+**How to validate success:**
+
+1. Run the script from the Brain instance
+2. Open Kibana (`http://10.0.2.10:5601` via VPN)
+3. Confirm log entries are appearing from Clinical Zone hosts
+4. Verify connection attempts on the expected ports are visible
+
+A successful run proves the full pipeline — Clinical Zone → Beats → Logstash → Elasticsearch → Kibana — is operational without conducting any active attack or violating AWS policies.
+
+---
+
+## 🔒 Post-Validation Hardening
+
+Once Kibana is confirmed working, the temporary bootstrap internet access must be removed. There are two options:
+
+---
+
+### Option A — Terraform (Recommended)
+
+Edit the files below, then run `terraform apply`. Terraform will update only the affected security groups and route table associations without touching running instances or their data.
+
+**1. In `security_groups.tf` — Brain SG egress:**
+
+```hcl
+# REMOVE the temporary bootstrap egress:
+egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+}
+
+# REPLACE with the locked-down version:
+egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["127.0.0.1/32"] # Block all outbound
+}
+```
+
+**2. In `security_groups.tf` — Clinical SG egress:** Same swap as above.
+
+**3. In `vpc.tf` — Remove the Clinical Zone's public route association:**
+
+```hcl
+# DELETE or comment out this entire block:
+resource "aws_route_table_association" "clinical_rta" {
+  subnet_id      = aws_subnet.clinical_zone.id
+  route_table_id = aws_route_table.public_rt.id
+}
+```
+
+**4. In `instances.tf` — Remove public IPs from Clinical Zone instances:**
+
+Set `associate_public_ip_address = false` on `win_workstation`, `imaging_server`, and `iot_gateway`.
+
+Then apply:
+
+```bash
+terraform plan   # Confirm only security group + association changes show up
+terraform apply
+```
+
+---
+
+### Option B — AWS Console (No Terraform Required)
+
+1. Go to **EC2 → Security Groups**
+2. Find `brain-sg` → **Edit outbound rules** → delete the `0.0.0.0/0` rule
+3. Find `clinical-sg` → **Edit outbound rules** → delete the `0.0.0.0/0` rule
+4. Go to **VPC → Route Tables** → find `Hospital-Public-RT` → **Subnet Associations** → disassociate the `Clinical-Zone` subnet
+
+> ⚠️ If you use Option B, your `terraform.tfstate` will be out of sync with real AWS state. Run `terraform plan` afterward to review the drift.
+
+---
+
+## 🔐 Security & Compliance
+
+| Control | Implementation |
+|---|---|
+| Network isolation | All assets in a private VPC; outbound blocked post-bootstrap |
+| No active exploits | Validation uses passive TCP handshakes only (`connect_ex`) |
+| AWS AUP compliance | Passive, internal-only posture; no external-facing honeypot |
+| AWS Pen Test Policy | No DoS simulation; no active attack tooling used |
+| Shared Responsibility | AWS Client VPN is the only entry point into the environment |
+| Elasticsearch security | `xpack.security.enabled=false` for dev — enable TLS before any production use |
+| Log integrity | All Beats traffic sent over TLS-encrypted connections to port 5044 |
+| Data persistence | Elasticsearch data persists across container restarts via a named Docker volume (`es_data`) |
+
+---
+
+## 🐳 ELK Stack Details (`docker-compose.yml`)
+
+All three services run on an isolated internal Docker bridge network (`honeypot-net`) so they communicate by container name without exposure to the broader VPC.
+
+| Container | Port | Role | Memory Cap |
+|---|---|---|---|
+| `elasticsearch` | 9200 | Log storage and indexing | 2GB (`ES_JAVA_OPTS`) |
+| `logstash` | 5044 | Ingests Beats from Clinical Zone | 1GB (`LS_JAVA_OPTS`) |
+| `kibana` | 5601 | Web dashboard (via VPN) | — |
+
+**Mandatory pre-start step** — run this on the Brain host VM before `docker-compose up`, or Elasticsearch will crash immediately:
+
+```bash
+sudo sysctl -w vm.max_map_count=262144
+```
+
+**Start the stack:**
+
+```bash
+cd /home/ubuntu
 docker-compose up -d
 ```
 
-Kibana will be accessible at `http://10.0.2.10:5601` via the AWS Client VPN.
-
-### Step 3 — Configure Logstash Pipeline
-
-Create `./logstash/pipeline/logstash.conf` on the Brain instance:
+**Logstash pipeline config** — must exist at `./logstash/pipeline/logstash.conf` on the Brain:
 
 ```conf
 input {
@@ -102,62 +306,55 @@ output {
 }
 ```
 
-### Step 4 — Install Log Shippers on Clinical Assets
-
-- **Windows Workstation:** Install and configure [Winlogbeat](https://www.elastic.co/beats/winlogbeat) to forward to `10.0.2.10:5044`
-- **Ubuntu Nodes (PACS, IoT Gateway):** Install and configure [Filebeat](https://www.elastic.co/beats/filebeat) to forward to `10.0.2.10:5044`
-
----
-
-## ✅ Validation
-
-Run the validation script **from the Brain instance** to generate synthetic traffic across all Clinical Zone assets and confirm the ELK stack is capturing events:
-
-```bash
-python3 validationScript.py
-```
-
-The script performs passive TCP "knocks" on all honeypot nodes across ports 80, 104, 445, and 502. These connection attempts are captured by Filebeat/Winlogbeat and forwarded to the Brain.
-
-After running, open Kibana and verify that log entries are appearing for the Clinical Zone hosts.
-
----
-
-## 🔒 Security & Compliance
-
-| Control                        | Implementation                                      |
-|-------------------------------|------------------------------------------------------|
-| Network isolation              | All assets are in a private VPC with no IGW attached |
-| Outbound internet blocked      | Security group egress rules block all external traffic |
-| No active exploits used        | Validation uses passive TCP handshakes only           |
-| Elasticsearch security         | `xpack.security.enabled=false` for dev; enable TLS for production |
-| AWS ToS compliance             | No active penetration testing performed              |
-
 ---
 
 ## ⚠️ Known Limitations & TODOs
 
-- [ ] AMI IDs and AWS region (`us-east-1`) are hardcoded — no `terraform.tfvars` or variable definitions yet
-- [ ] Windows 7 AMI availability on AWS is limited; currently using Windows Server 2012 as a substitute
-- [ ] Elasticsearch security (`xpack`) is disabled for development — must be enabled with TLS before any production-like use
+- [ ] **No `terraform.tfvars`** — region (`us-east-1`) is only configurable in `variables.tf`; a `.tfvars` file would improve multi-region flexibility
+- [ ] **Windows 7 unavailable on AWS** — Windows Server 2012 R2 is used as the closest available substitute
+- [ ] **Docker Compose in `user_data` is fragile** — inline heredoc YAML can break on whitespace/formatting issues; if the Brain fails to start ELK on first boot, the recommended fallback is to store `docker-compose.yml` in an S3 bucket and pull it down with `aws s3 cp` in `user_data`
+- [ ] **Windows PowerShell bootstrap** — the Winlogbeat install script in `instances.tf` targets PowerShell 3.0/4.0 compatibility and needs hands-on testing
+- [ ] **No remote Terraform state backend** — `terraform.tfstate` is local; for team use, configure S3 + DynamoDB locking
+- [ ] **xpack security disabled** — `xpack.security.enabled=false` must be enabled with TLS configured before any production-like deployment
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Cloud:** AWS (EC2, VPC, Route 53, Security Groups)
+- **Cloud:** AWS (EC2, VPC, Route 53, Security Groups, Internet Gateway)
 - **Infrastructure as Code:** Terraform
-- **Logging:** ELK Stack (Elasticsearch 8.10.2, Logstash 8.10.2, Kibana 8.10.2)
-- **Log Shippers:** Filebeat, Winlogbeat
-- **Honeypot Simulation:** Conpot (IoT/Modbus), DCM4CHE (DICOM/PACS)
+- **Logging:** ELK Stack — Elasticsearch 8.10.2, Logstash 8.10.2, Kibana 8.10.2
+- **Log Shippers:** Filebeat (Linux nodes), Winlogbeat (Windows)
+- **Honeypot Simulation:** Conpot (IoT/Modbus medical template), DCM4CHE (DICOM/PACS)
 - **Containerization:** Docker, Docker Compose
 - **Scripting:** Python 3
 
 ---
 
-## 📚 Acknowledgments
+## 🗑️ Teardown
 
-Google and Google Gemini were used to assist in the creation of several configuration files in this project, particularly around CIDR block calculations, ELK Stack tuning, and Docker Compose configuration. All AI-assisted content has been reviewed and adapted for this specific use case.
+To destroy all AWS resources and stop billing:
+
+```bash
+terraform destroy
+```
+
+Type `yes` when prompted. This removes all EC2 instances, the VPC, subnets, security groups, Route 53 hosted zone, key pair, and the internet gateway.
+
+---
+
+## 📚 References
+
+- [AWS Acceptable Use Policy](https://aws.amazon.com/aup/)
+- [AWS Penetration Testing Policy](https://aws.amazon.com/security/penetration-testing/)
+- [AWS Shared Responsibility Model](https://aws.amazon.com/compliance/shared-responsibility-model/)
+- [AWS EC2 T3 Instance Types](https://aws.amazon.com/ec2/instance-types/t3/)
+- [Elastic Filebeat](https://www.elastic.co/beats/filebeat)
+- [AWS Route 53 Private Hosted Zones](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/hosted-zones-private.html)
+- [Conpot](http://conpot.org/)
+- [Terraform Docs](https://developer.hashicorp.com/terraform/intro)
+
+Google, Google Gemini, and Claude AI were used to assist in the creation of configuration files, networking and security concepts, PowerShell scripting, and code revisions throughout this project. All AI-assisted content has been reviewed and adapted for this specific use case.
 
 ---
 
