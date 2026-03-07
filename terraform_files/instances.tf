@@ -20,7 +20,7 @@ resource "aws_instance" "the_brain" {
     tags                   = { Name = "The-Brain-ELK" }
 
     # CONFIGURE EVERYTHING ON STARTUP!!!
-    # Also creates and RUNS the Docker-Compose File - Cant do due to having multiple heredocs (bash and terraform would likely break the YAML formating and break everything)
+    # Also creates and RUNS the Docker-Compose File - Cant do due to having multiple heredocs (bash and terraform would likely break the YAML formating and break everything) - heredoc inception no good
     # Proposed solution: An S3 bucket in Terraform to store the file 
     # Will try to do Docker-Compose YAML here first and if it fails will do S3 bucket solution
     # Used AI to try to fix text alignment issues in heredocs before they happen, hoping for best
@@ -48,7 +48,7 @@ output {
 }
 LOG_CONFIG
 
-      # 4. Write Docker Compose file (Essentially a copy paste without comments)
+      # 4. Write Docker Compose file (Essentially a copy paste without comments), might be worth mentioning why Docker and not podman
       cat <<'COMPOSE_FILE' > /home/ubuntu/docker-compose.yml
 version: '3.8'
 services:
@@ -246,6 +246,7 @@ resource "aws_instance" "iot_gateway" {
 
       # 2. Run Conpot with the Medical Template
       # This maps Modbus (502) and HTTP (80) to mimic medical hardware
+      # IMPORTANT!! In case I dont get any feedback from HTTP knowcks on port 80, change -p 80:80, might fix
       docker run -d --name conpot_medical \
         -p 80:8888 \
         -p 502:502 \
