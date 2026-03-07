@@ -4,6 +4,11 @@
 # ==========================================
 
 # Google Gemini AI helped with brainstorming and research for this section, it also helped with polishing the code a little (removing incessary parts and rewriting some parts to make it more clear and professional)
+# Traffic Flow: 
+# 1. Attacker tries to talk to Honeypot (Clinical SG)
+# 2. Honeypot sends logs of attack to The brain (Brain SG via Port 5044)
+# 3. We log into The Brain to see the results (Brain SG via port 5601)
+
 
 # Brain SG: Security rules for "The Brain" (Management Zone)
 resource "aws_security_group" "brain_sg" {
@@ -12,7 +17,7 @@ resource "aws_security_group" "brain_sg" {
 
     # Allow the clinical equipment to send their logs to the Brain for storage
     ingress {
-        from_port   = 5044
+        from_port   = 5044 # 5044 Kibana dashboard port
         to_port     = 5044
         protocol    = "tcp"
         cidr_blocks = ["10.0.1.0/24"] # Allow Beats from Clinical Zone 
@@ -20,7 +25,7 @@ resource "aws_security_group" "brain_sg" {
 
     # Allow authorized staff to view the Kibana data dashboard via a secure VPN
     ingress {
-        from_port   = 5601
+        from_port   = 5601 # Default port used by Kibana
         to_port     = 5601
         protocol    = "tcp"
         cidr_blocks = ["10.0.0.0/16"] # Access via Client VPN 
@@ -28,7 +33,7 @@ resource "aws_security_group" "brain_sg" {
 
     # SSH ingress rule
     ingress {
-        from_port   = 22
+        from_port   = 22 # 22 is standard SSH port
         to_port     = 22
         protocol    = "tcp"
         cidr_blocks = ["10.0.0.0/16"] # Via VPN only
@@ -78,7 +83,8 @@ resource "aws_security_group" "clinical_sg" {
         cidr_blocks = ["10.0.2.0/24"] # Allow log shipping to Brain 
     }
 
-    # New Addition
+    # This egress is new addition
+    # This was a Claude AI recommendation
     # Allow DNS resolution via Route 53 (UDP port 53) — required for hospital.internal hostnames
     # Without this, internal DNS names like pacs.hospital.internal silently fail after bootstrap lockdown
     egress {
