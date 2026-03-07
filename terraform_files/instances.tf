@@ -119,6 +119,8 @@ resource "aws_instance" "win_workstation" {
     subnet_id              = aws_subnet.clinical_zone.id 
     vpc_security_group_ids = [aws_security_group.clinical_sg.id] 
     key_name               = aws_key_pair.honeypot_key.key_name  # This is part of SSH config
+    # IMPORTANT!!!! Once the initial terraform apply finishes and there is Kibana verification and comment out this FIX to remove internet access
+    associate_public_ip_address = true   # <-- THE FIX for internet while bootstraping 
     tags                   = { Name = "Win-Clinical-Workstation" } 
 
     # This part attempts to automate the Windows 2012 Legacy Server Instance 
@@ -176,6 +178,7 @@ resource "aws_instance" "imaging_server" {
     vpc_security_group_ids = [aws_security_group.clinical_sg.id]
     private_ip             = "10.0.1.20"
     key_name               = aws_key_pair.honeypot_key.key_name  # This is part of SSH config
+    associate_public_ip_address = true   # <-- THE FIX for internet while bootstraping 
     tags                   = { Name = "Imaging-Server-PACS" }
 
     # AUTOMATE EVERYTHING!!! 
@@ -225,6 +228,7 @@ resource "aws_instance" "iot_gateway" {
     vpc_security_group_ids = [aws_security_group.clinical_sg.id]
     private_ip             = "10.0.1.30"
     key_name               = aws_key_pair.honeypot_key.key_name  # This is part of SSH config
+    associate_public_ip_address = true   # <-- THE FIX for internet while bootstraping 
     tags                   = { Name = "IoT-Gateway-Conpot" }
 
     # AUTOMATE EVERYTHING!!! 
