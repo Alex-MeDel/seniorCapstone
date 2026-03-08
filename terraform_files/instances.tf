@@ -47,23 +47,27 @@ resource "aws_instance" "win_workstation" {
     tags                   = { Name = "Win-Clinical-Workstation" } 
 
     # This part attempts to automate the Windows 2012 Legacy Server Instance 
-    # I dont know any PowerShell, so this is 100% AI generated code(Claude AI), NEEDS REVISION!!!!
+    # I dont know any PowerShell, so this is 100% AI generated code(Gemeni AI), NEEDS REVISION!!!!
     user_data = <<-EOF
-    <powershell>
-    # Pull bootstrap script from S3 and execute
-    $bucket = "${aws_s3_bucket.bootstrap.id}"
-    $dest   = "C:\windows_bootstrap.ps1"
+        <powershell>
+        $bucket = "${aws_s3_bucket.bootstrap.id}"
+        $dest   = "C:\windows_bootstrap.ps1"
 
-
-    # FIX, given that AWS was picky about TLS 1.0 being default in Win Server 2016, here is fix recommended by Gemini AI
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    
-    # awscli isn't available on Windows - use .NET S3 download via instance role credentials
-    # The IAM role attached to this instance grants s3:GetObject
-    Invoke-WebRequest -Uri "https://$bucket.s3.amazonaws.com/windows_bootstrap.ps1" -OutFile $dest -UseBasicParsing
-    PowerShell.exe -ExecutionPolicy Bypass -File $dest
-    </powershell>
-    EOF
+        # Force TLS 1.2 for AWS S3 compatibility (Absolutely necesary or 403)
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        
+        # Download and silently install the AWS CLI
+        Invoke-WebRequest -Uri "https://awscli.amazonaws.com/AWSCLIV2.msi" -OutFile "C:\AWSCLIV2.msi"
+        Start-Process msiexec.exe -Wait -ArgumentList '/i C:\AWSCLIV2.msi /qn'
+        
+        # Use the AWS CLI to download the bootstrap script. 
+        # This automatically signs the request using your LabInstanceProfile!
+        & "C:\Program Files\Amazon\AWSCLIV2\aws.exe" s3 cp s3://$bucket/windows_bootstrap.ps1 $dest
+        
+        # Execute the downloaded script
+        PowerShell.exe -ExecutionPolicy Bypass -File $dest
+        </powershell>
+        EOF
 }
 
 # Imaging Server (Ubuntu + DICOM Sim) 
