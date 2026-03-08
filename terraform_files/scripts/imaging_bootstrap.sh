@@ -18,11 +18,12 @@ apt-get install -y default-jre wget unzip
 # ---------------------------------------------------
 echo "Installing DCM4CHE..."
 mkdir -p /opt/dcm4che
-wget -q https://github.com/dcm4che/dcm4che/releases/download/5.31.0/dcm4che-5.31.0-bin.zip \
-    -O /tmp/dcm4che.zip
+
+# Removed -q and updated to the correct SourceForge mirror - Turns out, full image wasnt even on GitHub, need to read the description better lol
+wget https://sourceforge.net/projects/dcm4che/files/dcm4che3/5.31.0/dcm4che-5.31.0-bin.zip/download -O /tmp/dcm4che.zip
+
 unzip -q /tmp/dcm4che.zip -d /opt/dcm4che/
 rm /tmp/dcm4che.zip  # cleanup
-
 # ---------------------------------------------------
 # 3. Create a systemd service for StoreSCP
 # Running as a service means it survives reboots and
@@ -34,7 +35,7 @@ Description=DCM4CHE StoreSCP - DICOM PACS Simulator
 After=network.target
 
 [Service]
-ExecStart=/opt/dcm4che/dcm4che-5.31.0/bin/storescp --accept-all --port 104
+ExecStart=/opt/dcm4che/dcm4che-5.31.0/bin/storescp -b STORESCP:104
 Restart=always
 RestartSec=5
 User=root

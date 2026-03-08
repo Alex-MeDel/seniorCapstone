@@ -24,11 +24,11 @@ systemctl start docker
 echo "Starting Conpot..."
 docker run -d \
     --name conpot_medical \
-    -p 80:80 \
-    -p 502:502 \
+    -p 80:8800 \
+    -p 502:5020 \
     --restart always \
-    mushorg/conpot:latest --template medical
-
+    honeynet/conpot:latest
+    
 echo "Conpot running on ports 80 (HTTP) and 502 (Modbus)"
 
 # ---------------------------------------------------

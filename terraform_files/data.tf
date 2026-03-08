@@ -17,14 +17,31 @@ data "aws_ami" "ubuntu" {
   }
 }
 
+# WIN Server 2012 END OF LIFE caused errors in initial terraform plan, will switch to Win Server 2016 to avoid having to create a custum AMI ID 
 # Dynamically fetch latest Windows Server 2012 R2 AMI from Amazon
-data "aws_ami" "windows_2012" {
+#data "aws_ami" "windows_2012" {
+#  most_recent = true
+#  owners      = ["801119661308"] # Amazon's official Windows AMI account ID
+#
+#  filter {
+#    name   = "name"
+#    values = ["Windows_Server-2012-R2_RTM-English-64Bit-Base-*"]
+#  }
+#
+#  filter {
+#    name   = "virtualization-type"
+#    values = ["hvm"]
+#  }
+#}
+
+# Dynamically fetch latest Windows Server 2016 AMI from Amazon
+data "aws_ami" "windows_2016" {
   most_recent = true
   owners      = ["801119661308"] # Amazon's official Windows AMI account ID
 
   filter {
     name   = "name"
-    values = ["Windows_Server-2012-R2_RTM-English-64Bit-Base-*"]
+    values = ["Windows_Server-2016-English-Full-Base-*"]
   }
 
   filter {

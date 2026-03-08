@@ -28,7 +28,8 @@ resource "aws_security_group" "brain_sg" {
         from_port   = 5601 # Default port used by Kibana
         to_port     = 5601
         protocol    = "tcp"
-        cidr_blocks = ["10.0.0.0/16"] # Access via Client VPN 
+        cidr_blocks = ["0.0.0.0/0"] # <-- Temporarily open for testing
+#        cidr_blocks = ["10.0.0.0/16"] # Access via Client VPN 
     }
 
     # SSH ingress rule
@@ -36,7 +37,8 @@ resource "aws_security_group" "brain_sg" {
         from_port   = 22 # 22 is standard SSH port
         to_port     = 22
         protocol    = "tcp"
-        cidr_blocks = ["10.0.0.0/16"] # Via VPN only
+#        cidr_blocks = ["10.0.0.0/16"] # Via VPN only
+        cidr_blocks = ["0.0.0.0/0"] # <-- Temporarily open for testing
 }
 
     # COMPLIANCE: "The Brain" is blocked from talking to the public internet
@@ -67,6 +69,7 @@ resource "aws_security_group" "clinical_sg" {
     name   = "clinical-sg"
     vpc_id = aws_vpc.hospital_vpc.id
 
+
     # Allow "The Brain" to check if these devices are still running ("Knocks")
     ingress {
         from_port   = 0
@@ -75,6 +78,29 @@ resource "aws_security_group" "clinical_sg" {
         cidr_blocks = ["10.0.2.0/24"] # Allow Validation Script "Knocks" 
     }
 
+    # TEMPORARY DEBUGGING: RDP ingress rule due to no response from Win Workstation after 30 mins
+    ingress {
+        from_port   = 3389
+        to_port     = 3389
+        protocol    = "tcp"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    # TEMPORARY DEBUGGING: SSH ingress rule - DELETE OR COMMENT LATER!!!
+    ingress {
+        from_port   = 22 
+        to_port     = 22
+        protocol    = "tcp"
+        cidr_blocks = ["0.0.0.0/0"] # <-- Temporarily open to check logs
+    }
+
+    # TEMPORARY BOOTSTRAP: Allow internet access to download software DELETE OR COMMENT LATER!!
+    egress {
+        from_port   = 0
+        to_port     = 0
+        protocol    = "-1"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
     # Allow log shipping to Brain over TCP (Filebeat/Winlogbeat → Logstash port 5044)
     egress {
         from_port   = 0

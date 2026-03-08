@@ -17,7 +17,8 @@ resource "aws_instance" "the_brain" {
     private_ip             = "10.0.2.10" # Just sets static IP for this particular device
     key_name               = aws_key_pair.honeypot_key.key_name  # This is part of SSH config
     associate_public_ip_address = true   # This line will give the brain access to a public IP address for bootstraping
-    iam_instance_profile = aws_iam_instance_profile.ec2_profile.name # Part of S3 fix    
+#    iam_instance_profile = aws_iam_instance_profile.ec2_profile.name # Part of S3 fix (Had to change due to learners lab)
+    iam_instance_profile = "LabInstanceProfile"
     tags                   = { Name = "The-Brain-ELK" }
 
     # CONFIGURE EVERYTHING ON STARTUP!!!
@@ -33,14 +34,16 @@ resource "aws_instance" "the_brain" {
 # Medical Workstation (Windows 7 or 2012 Legacy) - Still deciding
 # Simulates an old Windows computer used by nurses or doctors
 resource "aws_instance" "win_workstation" {
-    ami                    = data.aws_ami.windows_2012.id # Windows Server 2012, set in data.tf, dynamic AMI IDs
+#    ami                    = data.aws_ami.windows_2012.id # Windows Server 2012, set in data.tf, dynamic AMI IDs
+    ami                    = data.aws_ami.windows_2016.id # <-- Win Server 2016 AMI ID problem fix
     instance_type          = "t3.medium"
     subnet_id              = aws_subnet.clinical_zone.id 
     vpc_security_group_ids = [aws_security_group.clinical_sg.id] 
     key_name               = aws_key_pair.honeypot_key.key_name  # This is part of SSH config
     # IMPORTANT!!!! Once the initial terraform apply finishes and there is Kibana verification and comment out this FIX to remove internet access
     associate_public_ip_address = true   # <-- THE FIX for internet while bootstraping 
-    iam_instance_profile = aws_iam_instance_profile.ec2_profile.name # Part of S3 fix
+#    iam_instance_profile = aws_iam_instance_profile.ec2_profile.name # Part of S3 fix
+    iam_instance_profile = "LabInstanceProfile"
     tags                   = { Name = "Win-Clinical-Workstation" } 
 
     # This part attempts to automate the Windows 2012 Legacy Server Instance 
@@ -51,6 +54,10 @@ resource "aws_instance" "win_workstation" {
     $bucket = "${aws_s3_bucket.bootstrap.id}"
     $dest   = "C:\windows_bootstrap.ps1"
 
+
+    # FIX, given that AWS was picky about TLS 1.0 being default in Win Server 2016, here is fix recommended by Gemini AI
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    
     # awscli isn't available on Windows - use .NET S3 download via instance role credentials
     # The IAM role attached to this instance grants s3:GetObject
     Invoke-WebRequest -Uri "https://$bucket.s3.amazonaws.com/windows_bootstrap.ps1" -OutFile $dest -UseBasicParsing
@@ -69,7 +76,8 @@ resource "aws_instance" "imaging_server" {
     private_ip             = "10.0.1.20"
     key_name               = aws_key_pair.honeypot_key.key_name  # This is part of SSH config
     associate_public_ip_address = true   # <-- THE FIX for internet while bootstraping 
-    iam_instance_profile = aws_iam_instance_profile.ec2_profile.name # Part of S3 fix
+    iam_instance_profile = "LabInstanceProfile"
+#    iam_instance_profile = aws_iam_instance_profile.ec2_profile.name # Part of S3 fix
     tags                   = { Name = "Imaging-Server-PACS" }
 
     # AUTOMATE EVERYTHING!!! 
@@ -86,7 +94,8 @@ resource "aws_instance" "iot_gateway" {
     private_ip             = "10.0.1.30"
     key_name               = aws_key_pair.honeypot_key.key_name  # This is part of SSH config
     associate_public_ip_address = true   # <-- THE FIX for internet while bootstraping 
-    iam_instance_profile = aws_iam_instance_profile.ec2_profile.name # Part of S3 fix
+#    iam_instance_profile = aws_iam_instance_profile.ec2_profile.name # Part of S3 fix
+    iam_instance_profile = "LabInstanceProfile"
     tags                   = { Name = "IoT-Gateway-Conpot" }
 
     # AUTOMATE EVERYTHING!!! 

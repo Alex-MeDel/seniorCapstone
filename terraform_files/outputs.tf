@@ -15,5 +15,8 @@ output "ubuntu_ami_used" {
 }
 
 output "windows_ami_used" {
-  value = data.aws_ami.windows_2012.id
+  value = data.aws_ami.windows_2016.id # <-- WIN 2016 Server fix
 }
+#output "windows_ami_used" {
+#  value = data.aws_ami.windows_2012.id
+#}
