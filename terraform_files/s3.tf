@@ -53,6 +53,13 @@ resource "aws_s3_object" "windows_script" {
   etag   = filemd5("${path.module}/scripts/windows_bootstrap.ps1")
 }
 
+resource "aws_s3_object" "logstash_conf" {
+  bucket = aws_s3_bucket.bootstrap.id
+  key    = "logstash.conf"
+  source = "${path.module}/scripts/logstash.conf"
+  etag   = filemd5("${path.module}/scripts/logstash.conf")
+}
+
 # ==============================
 # IAM permissions
 # EC2 instances need IAM permission to read from the S3 bucket, according to claude AI it will get a 403 error, IAM role attached to instances is needed
