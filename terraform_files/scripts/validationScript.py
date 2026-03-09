@@ -17,7 +17,7 @@ import logging
 TARGETS = {
     # These will be the internal DNS names that will be defined in the Route 53 Private Hosted Zone (hospital.internal)
     # These can be replaced with static IP addresses, with a few changes if needed
-    "Medical Workstation (SMB)": "medical-workstation.hospital.internal", # Windows 7 
+    "Medical Workstation (SMB)": "medical-workstation.hospital.internal", # Windows Server 2016
     "Imaging Server (DICOM)": "pacs.hospital.internal",                  # Ubuntu + DCM4CHE 
     "IoT Gateway (HTTP/Modbus)": "iot-gateway.hospital.internal"         # Conpot 
 }

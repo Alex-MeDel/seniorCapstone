@@ -1,28 +1,8 @@
-
-# Goal of this, is to redeploy the entire hospital environment automatically if an instance crashes or needs to be reset
-# Hybrid Architecture (Containers + VMs) + VPC, Subnets, Security Groups, compute resources, etc.
-
-# TO DO LIST: 
-# 5. Solution for how to deploy the docker-compose YAML within AWS would be to store the docker-compose file in an S3 bucket and have user_data pull it down with aws s3 cp. 
-
-
-
-# Deploy sequence should be: (Check README.md for more information on deployment sequence)
-# 1. ssh-keygen -t rsa -b 4096 -f ~/.ssh/honeypot_key
-# 2. terraform init
-# 3. terraform plan
-# 4. terraform apply
-# 5. Wait ~5min for user_data to finish then SSH into brain and run `docker ps` to confirm ELK is up
-# THEN
-# 1. Make changes to main.tf to restrict internet access
-# 2. Run Validation Script from "The Brain" instance, can maybe put it in an S3 bucket
-# 3. Check if Kibana lights up
-
 # ==========================================
 # HOSPITAL HONEYPOT AUTOMATED DEPLOYMENT
-# This script acts as a sort of blueprint, when run, AWS will automatically build 
-# the entire hospital network, servers, and security rules, as defined
-# Compliance: Strict outbound blocking to adhere to AWS Terms of Service 
+# Description: Infrastructure as Code (IaC) blueprint to automatically provision 
+# a segmented hospital network, decoy servers, and security groups.
+# Compliance: Strict outbound traffic blocking to adhere to AWS Acceptable Use Policy.
 # ==========================================
 
 # ==========================================
@@ -35,10 +15,13 @@
 # snippets were manually reviewed, cross-referenced with official AWS and HashiCorp
 # documentation, and locally tested for functionality. All conceptual networking
 # designs and the honeypot strategy are original work. Specific code sections heavily
-# influenced by AI are marked with internal comments citing the model used.
+# influenced by AI are marked with internal comments citing the model used. AI was 
+# also used for the purpose of debugging during test deployments, and for code
+# and comment polishing after the successful deployment.
 # ==========================================
 
-# This tells Terraform to build the infrastructure in the region us-east-1 (I thought it was most comvinient)
+# This tells Terraform to build the infrastructure in the region set in the variables.tf file
+# in this case, us-east-1 (N.Virginia) given that it was the default region for our location
 provider "aws" {
     region = var.aws_region
 }

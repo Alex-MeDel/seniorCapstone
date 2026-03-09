@@ -33,6 +33,7 @@ mkdir -p /home/ubuntu/logstash/pipeline
 
 aws s3 cp s3://${bucket_name}/docker-compose.yml     /home/ubuntu/docker-compose.yml
 aws s3 cp s3://${bucket_name}/logstash.conf          /home/ubuntu/logstash/pipeline/logstash.conf
+aws s3 cp s3://${bucket_name}/validationScript.py    /home/ubuntu/validationScript.py
 
 # Fix ownership so ubuntu user can interact with the files
 chown -R ubuntu:ubuntu /home/ubuntu
@@ -45,4 +46,4 @@ cd /home/ubuntu
 docker-compose up -d
 
 echo "=== Brain Bootstrap Complete ==="
-echo "Kibana will be available on port 5601 in ~2 minutes"
+echo "Kibana will be available on port 5601 in about 5 minutes"

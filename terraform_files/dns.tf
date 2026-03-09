@@ -1,6 +1,7 @@
 # ==========================================
-# STEP 4: PRIVATE DNS (Route 53/Internal Phonebook) 
-# This allows our servers to talk to each other using names instead of numbers
+# INTERNAL DNS: Route 53 Private Hosted Zone
+# Description: Establishes a private namespace to allow instances 
+# to communicate via FQDNs rather than static IP addresses.
 # ==========================================
 
 # Creates a private directory called "hospital.internal" only visible inside this VPC
@@ -8,6 +9,10 @@ resource "aws_route53_zone" "private" {
     name = "hospital.internal"
     vpc { vpc_id = aws_vpc.hospital_vpc.id } # This tells AWS to create a private DNS Zone (Domain that doesnt exist in public internet)
 }
+
+# ------------------------------------------
+# DNS A-RECORDS (IPv4 Address Mapping)
+# ------------------------------------------
 
 # Assigns the name "pacs.hospital.internal" to our Imaging Server's address
 resource "aws_route53_record" "pacs" {
