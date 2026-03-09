@@ -1,15 +1,23 @@
 #!/bin/bash
 
-# Installs DCM4CHE (DICOM/PACS simulator) and Filebeat
-# Runs on: Imaging Server (t3.micro, 10.0.1.20)
+# =======================================================
+# DEPLOYMENT SCRIPT: Imaging Server (PACS Simulator)
+# Description: Provisions Java dependencies, installs DCM4CHE 
+# to simulate a DICOM receiver (Port 104), and configures Filebeat.
+# Target OS: Ubuntu 22.04 LTS | Instance: t3.micro (10.0.1.20)
+# =======================================================
 
+# AI Disclaimer
+# Claude AI helped me develop this bash script, specially around the download of DCM4CHE and filebit config
+# Enforce strict error handling and log all output for debugging
 set -e
 exec > /var/log/imaging_bootstrap.log 2>&1
 echo "=== Imaging Server Bootstrap Starting ==="
 
 # ---------------------------------------------------
-# 1. Install Java (required for DCM4CHE) and tools
+# 1. Provision Core Dependencies (Java JRE & Utilities)
 # ---------------------------------------------------
+echo "Installing Java and required tools..."
 apt-get update -y
 apt-get install -y default-jre wget unzip
 
@@ -24,11 +32,12 @@ wget https://sourceforge.net/projects/dcm4che/files/dcm4che3/5.31.0/dcm4che-5.31
 
 unzip -q /tmp/dcm4che.zip -d /opt/dcm4che/
 rm /tmp/dcm4che.zip  # cleanup
+
 # ---------------------------------------------------
-# 3. Create a systemd service for StoreSCP
-# Running as a service means it survives reboots and
-# restarts automatically - more reliable than nohup
+# 3. Provision Systemd Daemon for StoreSCP
 # ---------------------------------------------------
+# Encapsulating the simulator as a systemd service ensures high 
+# availability, automatic restarts on failure, and boot persistence.
 cat > /etc/systemd/system/storescp.service <<'SERVICE'
 [Unit]
 Description=DCM4CHE StoreSCP - DICOM PACS Simulator
@@ -47,7 +56,7 @@ SERVICE
 systemctl daemon-reload
 systemctl enable storescp
 systemctl start storescp
-echo "StoreSCP running on port 104"
+echo "StoreSCP simulator actively listening on TCP Port 104"
 
 # ---------------------------------------------------
 # 4. Install Filebeat
@@ -64,8 +73,8 @@ apt-get update -y && apt-get install -y filebeat
 
 # ---------------------------------------------------
 # 5. Configure Filebeat
-# Ships /var/log/*.log to Logstash on The Brain
 # ---------------------------------------------------
+# Ships local system logs to the centralized Logstash pipeline on The Brain
 cat > /etc/filebeat/filebeat.yml <<'FILEBEAT'
 filebeat.inputs:
   - type: filestream

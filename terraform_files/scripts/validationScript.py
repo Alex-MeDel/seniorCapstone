@@ -1,5 +1,11 @@
 import socket
-import logging
+
+# =======================================================
+# VALIDATION SCRIPT: Hospital Honeypot Telemetry Tester
+# Description: Systematically executes benign TCP handshakes across 
+# the Clinical Zone decoys to validate ELK stack log ingestion.
+# Execution Context: Run locally on "The Brain" (10.0.2.10)
+# =======================================================
 
 # Full Disclosure, I used Google, and Google Gemini to assist me in the creation of this script
 
