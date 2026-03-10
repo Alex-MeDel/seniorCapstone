@@ -43,7 +43,7 @@ resource "aws_security_group" "brain_sg" {
 
     # INGRESS: Allow the clinical equipment to send their logs to the Brain for storage
     ingress {
-        from_port   = 5044 # 5044 Kibana dashboard port
+        from_port   = 5044 # 5044 Logstash port
         to_port     = 5044
         protocol    = "tcp"
         cidr_blocks = ["10.0.1.0/24"] # Allow Beats from Clinical Zone 
@@ -91,7 +91,7 @@ resource "aws_security_group" "clinical_sg" {
     #    cidr_blocks = ["0.0.0.0/0"] # <-- Temporarily open to check logs
     #}
 
-    # EGRESS: Allow log shipping to Brain over TCP (Filebeat/Winlogbeat → Logstash port 5601)
+    # EGRESS: Allow log shipping to Brain over TCP (Filebeat/Winlogbeat → Logstash port 5044)
     egress {
         from_port   = 0
         to_port     = 65535
