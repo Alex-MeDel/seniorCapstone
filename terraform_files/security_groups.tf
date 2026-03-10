@@ -91,7 +91,7 @@ resource "aws_security_group" "clinical_sg" {
     #    cidr_blocks = ["0.0.0.0/0"] # <-- Temporarily open to check logs
     #}
 
-    # EGRESS: Allow log shipping to Brain over TCP (Filebeat/Winlogbeat → Logstash port 5044)
+    # EGRESS: Allow log shipping to Brain over TCP (Filebeat/Winlogbeat → Logstash port 5601)
     egress {
         from_port   = 0
         to_port     = 65535
