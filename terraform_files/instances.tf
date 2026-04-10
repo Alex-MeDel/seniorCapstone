@@ -32,6 +32,11 @@ resource "aws_instance" "the_brain" {
     iam_instance_profile = "LabInstanceProfile" # hard coded due to Learner Lab limitations
     tags                   = { Name = "The-Brain-ELK" } # This is for billing info, AI recommendation
 
+    # Increases disk space to 30GB, needed for ELK stack
+    root_block_device {
+      volume_size = 30  # Bumps the hard drive from 8GB to 30GB
+      volume_type = "gp3" # General Purpose SSD (Cheaper and faster)
+    }
     # CONFIGURE EVERYTHING ON STARTUP!!!
     # Passes the dynamic S3 bucket ID to the bash script to retrieve the Docker Compose file
     user_data = templatefile("${path.module}/scripts/brain_bootstrap.sh", {
